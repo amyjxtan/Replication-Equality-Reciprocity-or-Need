@@ -1,0 +1,16 @@
+---
+title: "CSS 205/POLI 271 Final Project"
+author: "Amy Tan"
+format: pdf
+editor: visual
+---
+
+## Load the data for your replication project into R. Produce the following:
+
+1.  A histogram of the dependent variable
+
+2.  A correlation matrix for the DV and IVs that the original authors included in the model you are replicating
+
+3.  A visual or tabular depiction of the missingness in the data from part (2); see p. 251-255 of the text.
+
+Submit this output as a pdf file.
