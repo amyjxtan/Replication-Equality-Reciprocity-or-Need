@@ -7,10 +7,57 @@ editor: visual
 
 ## Load the data for your replication project into R. Produce the following:
 
+```{r}
+library(haven)
+library(tidyverse)
+study2_df <- read_sav('original_data/Study2.sav')
+
+```
+
 1.  A histogram of the dependent variable
+
+    ```{r}
+    library(ggplot2)
+
+    ggplot(study2_df, aes(x=control)) + 
+      geom_bar()
+
+    ```
+
+```{r}
+ggplot(study2_df, aes(x=suma)) + 
+  geom_bar()
+```
+
+```{r}
+ggplot(study2_df, aes(x=praca)) + 
+  geom_bar()
+```
+
+```{r}
+ggplot(study2_df, aes(x=potreba)) + 
+  geom_bar()
+```
+
+```{r}
+ggplot(study2_df, aes(x=pila)) + 
+  geom_bar()
+```
 
 2.  A correlation matrix for the DV and IVs that the original authors included in the model you are replicating
 
+    ```{r}
+
+    ```
+
 3.  A visual or tabular depiction of the missingness in the data from part (2); see p. 251-255 of the text.
 
+    ```{r}
+
+    ```
+
 Submit this output as a pdf file.
+
+## Data
+
+Accessed from [Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/6KCW8Z).
