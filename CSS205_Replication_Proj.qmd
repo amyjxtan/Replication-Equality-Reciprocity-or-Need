@@ -8,19 +8,72 @@ editor: visual
 ## Load the data for your replication project into R. Produce the following:
 
 ```{r}
+# importing relevant libraries
 library(haven)
 library(tidyverse)
-study2_df <- read_sav('original_data/Study2.sav')
+library(ggplot2)
 
+# Saving study 2 data as s2
+s2 <- read_sav('original_data/Study2.sav')
+
+# Data cleaning code provided from authors' Dataverse Rmd
+
+# Convert the 'home' column into a factor.
+# Levels 1-4 are mapped to descriptive labels for different types of responses.
+s2$home= factor(s2$home, 
+                levels = c(1, 2,3,4), 
+                labels = c("home-answered","away-notanswered","home-return", "away-return"))
+
+# Convert the 'consent' column into a factor.
+# Level 1 becomes "yes" and level 2 becomes "no".
+s2$consent= factor(s2$consent, 
+                   levels = c(1, 2), 
+                   labels = c("yes","no"))
+
+# Convert the 'etnic_ascr' column into a factor.
+# Level 1 is labeled "slovak" and level 2 is labeled "roma".
+s2$etnic_ascr= factor(s2$etnic_ascr, 
+                      levels = c(1, 2), 
+                      labels = c("slovak","roma"))
+
+# Convert the 'etnicita' column into a factor.
+# Levels 1, 2, and 3 are mapped to "slovak", "roma", and "other" respectively.
+s2$etnicita= factor(s2$etnicita, 
+                    levels = c(1, 2,3), 
+                    labels = c("slovak","roma","other"))
+
+# Ensure that the 'age' column is numeric.
+s2$age <- as.numeric(s2$age)
+
+# Create a lookup vector mapping ages to years.
+# For each value in 'age' from 9 to 72, recode it to a corresponding year from 1996 to 1933.
+# The result is stored in a new variable called 'roky'.
+lookup <- setNames(1996:1933, 9:72)
+s2$roky <- lookup[as.character(s2$age)]
+
+# Calculate a new variable 'years' representing the difference between 2019 and the recoded year.
+s2$years <- 2019 - s2$roky
+
+# Convert the 'gender' column into a factor.
+# Level 1 is labeled "Male" and level 2 is labeled "Female".
+s2$gender <- factor(s2$gender, 
+                    levels = c(1, 2), 
+                    labels = c("Male","Female"))
+
+# Create a subset of the data containing only rows where consent is "yes".
+s2_consent <- dplyr::filter(s2, consent=="yes")
+
+# Further filter the subset to exclude rows where 'etnic_ascr' is "NA".
+s2_consent <- dplyr::filter(s2_consent, etnic_ascr != "NA")
+
+# Further filter the subset to only include rows where multiple survey items (e.g., eurofondy_iv, skolka_iv, etc.) have values less than 5. 
+s2_consent <- dplyr::filter(s2_consent, eurofondy_iv<5 & skolka_iv<5 & skolka_agree<5 & skolka_vote<5 & skolka_norms < 5 & control < 5 & suma < 5 & praca < 5 & potreba<5 & pila <5 )
 ```
 
 1.  A histogram of the dependent variable
 
     ```{r}
-    library(ggplot2)
 
-    ggplot(study2_df, aes(x=control)) + 
-      geom_bar()
 
     ```
 
