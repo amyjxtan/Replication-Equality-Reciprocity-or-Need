@@ -10,8 +10,16 @@ editor: visual
 ```{r}
 # importing relevant libraries
 library(haven)
+library(tidyr)
+library(reshape2)
 library(tidyverse)
 library(ggplot2)
+library(dplyr)
+library(moments)
+library(corrplot)
+library(naniar)
+library(ordinal)
+
 
 # Saving study 2 data as s2
 s2 <- read_sav('original_data/Study2.sav')
@@ -68,49 +76,153 @@ s2_consent <- dplyr::filter(s2_consent, etnic_ascr != "NA")
 
 # Further filter the subset to only include rows where multiple survey items (e.g., eurofondy_iv, skolka_iv, etc.) have values less than 5. 
 s2_consent <- dplyr::filter(s2_consent, eurofondy_iv<5 & skolka_iv<5 & skolka_agree<5 & skolka_vote<5 & skolka_norms < 5 & control < 5 & suma < 5 & praca < 5 & potreba<5 & pila <5 )
+
+s2_consent <- mutate(s2_consent, ID = row_number())
+
+s2_mains <- melt(s2_consent,
+        # ID variables - all the variables to keep but not split apart on
+    id.vars=c("etnic_ascr", "ID","eurofondy_iv","skolka_iv" ),
+        # The source columns
+    measure.vars=c("control", "suma", "praca","potreba","pila"),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+    variable.name="condition",
+    value.name="measurement"
+)
+
+s2_mains <- filter(s2_mains, condition!="pila") 
+
+# s2_dvs <- s2_mains %>%
+#   group_by(etnic_ascr,condition)%>%
+#   dplyr::select(-ID:-skolka_iv) %>%
+#   get_summary_stats(type = c("mean_sd"))%>%
+#   dplyr::select(-variable)%>%
+#   dplyr::mutate(condition = dplyr::recode(condition,
+#     "control" = "Control",
+#     "suma" = "Equality",
+#     "praca" = "Reciprocity",
+#     "potreba" = "Need"))%>%
+#   dplyr::mutate(sd = round(sd,2))
+#       
+# 
+# dvstt <- s2_mains %>% 
+# #  pivot_longer(contains("att_"))%>% 
+#     group_by(etnic_ascr)%>% 
+#     t_test(measurement~condition, detailed = T)      
+
 ```
 
 1.  A histogram of the dependent variable
 
     ```{r}
+    # creating a new dataframe where IV contains the condition, and DV contains the the response
+    s2_long <- pivot_longer(
+      s2_consent,
+      cols = c("control", "suma", "praca", "potreba", "pila"),  
+      names_to = "IV", 
+      values_to = "DV"  
+    )
 
-
+    ggplot(s2_long, aes(x = DV)) +
+      geom_bar(fill = "skyblue") +
+      labs(title = "Welfare Policy Support", x = "Completely Disagree (1) - Completely Agree (4)", y = "Frequency") +
+      theme_minimal()
     ```
-
-```{r}
-ggplot(study2_df, aes(x=suma)) + 
-  geom_bar()
-```
-
-```{r}
-ggplot(study2_df, aes(x=praca)) + 
-  geom_bar()
-```
-
-```{r}
-ggplot(study2_df, aes(x=potreba)) + 
-  geom_bar()
-```
-
-```{r}
-ggplot(study2_df, aes(x=pila)) + 
-  geom_bar()
-```
 
 2.  A correlation matrix for the DV and IVs that the original authors included in the model you are replicating
 
     ```{r}
+    dummies <- model.matrix(~ IV - 1, data = s2_long)
+
+    # Combine dummy variables with the numeric variable
+    df_for_corr <- cbind(dummies, DV = s2_long$DV)
+
+    # Compute the correlation matrix
+    corr_matrix2 <- cor(df_for_corr)
+
+    # Plot the correlation matrix
+    corrplot(corr_matrix2, 
+             method = "color",        
+             addCoef.col = "black",  
+             tl.col = "black", 
+             type = "upper",
+             title = "Correlation Matrix", 
+             mar = c(0, 0, 1, 0))
 
     ```
 
-3.  A visual or tabular depiction of the missingness in the data from part (2); see p. 251-255 of the text.
+3.  library(naniar)
+
+4.  A visual or tabular depiction of the missingness in the data from part (2); see p. 251-255 of the text.
 
     ```{r}
 
-    ```
+    vis_miss(s2_consent)
 
-Submit this output as a pdf file.
+    missing_summary <- miss_var_summary(s2_consent)
+    print(missing_summary)
+
+    ```
 
 ## Data
 
 Accessed from [Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/6KCW8Z).
+## The Original Paper
+
+-   Have a section about the original paper that answers the following questions:
+
+    -   What is the unit of analysis? I.e., what are the cases in the dataset?
+
+    -   Do you have any concerns about observational independence?
+
+    -   What is the dependent variable for the model you are replicating?
+
+    -   How many observations are there?
+
+    -   How were the data sampled (an internet survey? All available cases? something else?)
+
+    -   What do the original authors hope to achieve with the statistical model(s) you focus on? (description? prediction? causal inference?)
+
+    -   Describe the DV. **Include a plot of the distribution of the DV** and highlight any important qualities (binary? categorical? truncated in some way? Rare? Bimodal? etc.)
+
+    -   How did the author handle missing data?
+
+    -   What kind of model are you replicating (logit? probit? negative binomial? etc.)
+
+
+-   Demonstrate that you successfully replicated the authors’ original model. This means you will include a regression table in your paper in which the coefficient estimates, standard errors, and the number of observations are exactly the same as in the original paper.
+
+## Original Model: Ordered Logit
+
+```{r}
+s2_mains$condition <- dplyr::recode(s2_mains$condition, suma = "equal", praca = "reciprocity", potreba="need", control = "control")
+s2_mains$measurement <- as.factor(s2_mains$measurement)
+
+model <- clmm(measurement ~ condition * etnic_ascr + (1|ID),data = s2_mains, threshold = "equidistant", Hess = T)
+summary(model)
+```
+
+## An Additional Model: Multinomial Logit
+
+-   State the additional model(s) you are considering. The additional model(s) **must** be fit to the same dependent variable. Explain why you chose the model(s) you did.
+
+-   Provide a regression table that reports the results from this new model(s).
+
+## Comparing and Evaluating Models
+
+-   Compare the original model and your new model(s) based on their in- and out-of-sample predictive performance. You will use cross-validation for the latter.
+
+-   Decide which model you think is best and justify your decision.
+
+-   For the best model, you will describes how a particular independent variable of your choosing relates to the dependent variable. A good paper will include a carefully described quantity of interest and present the interpretive estimate in table or graphical form that accurately incorporates our uncertainty around the estimated quantity of interest.
+
+## Conclusion
+
+-   Summarize your conclusions. How confident are you in the authors’ conclusions after this exercise? What more would you like to see done with this paper?
+
+## Appendix
+
+I used ChatGPT (<https://chatgpt.com/share/67af6953-53d0-8008-a46d-3be0d43b06fc>) to help break down the original papers' data cleaning process. It was quite helpful and helped me understand how they cleaned the filtered the raw data.
+
+## References
+
