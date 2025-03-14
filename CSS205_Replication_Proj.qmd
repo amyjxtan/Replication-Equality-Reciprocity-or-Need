@@ -3,11 +3,13 @@ title: "CSS 205/POLI 271 Final Project"
 author: "Amy Tan"
 format: pdf
 editor: visual
+execute:
+  include: true 
+  warning: false
+  message: false
 ---
 
-## Load the data for your replication project into R. Produce the following:
-
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # importing relevant libraries
 library(haven)
 library(tidyr)
@@ -15,158 +17,42 @@ library(reshape2)
 library(tidyverse)
 library(ggplot2)
 library(dplyr)
-library(moments)
-library(corrplot)
-library(naniar)
-library(ordinal)
+library(MASS)
+library(nnet)
+library(stargazer)
+library(caret)
 
 
-# Saving study 2 data as s2
-s2 <- read_sav('original_data/Study2.sav')
+# Saving study 3 data as s3
+s3 <- read_sav('original_data/Study3.sav')
 
 # Data cleaning code provided from authors' Dataverse Rmd
+s3$group= factor(s3$SKUPINA, 
+                 levels = c(1,2,3,4), 
+                 labels = c("Control","Equality", "Reciprocity", "Need"))
+s3$SEX <- factor(s3$SEX, 
+                 levels = c(1, 2), 
+                 labels = c("Male","Female"))
+s3$AGECAT= factor(s3$AGECAT, 
+                  levels = c(1,2,3,4,5,6), 
+                  labels = c("18-24","25-34","35-44", "45-54","55-64","65+"))
+s3$EDU= factor(s3$EDU, 
+               levels = c(1, 2,3,4), 
+               labels = c("Primary","Secondary (no diploma)","Secondary (complete)", "University"))
+s3$SIZE= factor(s3$SIZE, 
+                levels = c(1, 2,3,4,5), 
+                labels = c("less than 1k","1k-4 999","5k-19 999", "20k - 99 999","100k+"))
+s3$REG= factor(s3$REG, 
+               levels = c(1, 2,3,4,5,6,7,8), 
+               labels = c("Bratislavsky","Trnavsky","Trenciansky", "Nitriansky","Zilinsky","Banskobystricky","Presovsky","Kosicky"))
 
-# Convert the 'home' column into a factor.
-# Levels 1-4 are mapped to descriptive labels for different types of responses.
-s2$home= factor(s2$home, 
-                levels = c(1, 2,3,4), 
-                labels = c("home-answered","away-notanswered","home-return", "away-return"))
-
-# Convert the 'consent' column into a factor.
-# Level 1 becomes "yes" and level 2 becomes "no".
-s2$consent= factor(s2$consent, 
-                   levels = c(1, 2), 
-                   labels = c("yes","no"))
-
-# Convert the 'etnic_ascr' column into a factor.
-# Level 1 is labeled "slovak" and level 2 is labeled "roma".
-s2$etnic_ascr= factor(s2$etnic_ascr, 
-                      levels = c(1, 2), 
-                      labels = c("slovak","roma"))
-
-# Convert the 'etnicita' column into a factor.
-# Levels 1, 2, and 3 are mapped to "slovak", "roma", and "other" respectively.
-s2$etnicita= factor(s2$etnicita, 
-                    levels = c(1, 2,3), 
-                    labels = c("slovak","roma","other"))
-
-# Ensure that the 'age' column is numeric.
-s2$age <- as.numeric(s2$age)
-
-# Create a lookup vector mapping ages to years.
-# For each value in 'age' from 9 to 72, recode it to a corresponding year from 1996 to 1933.
-# The result is stored in a new variable called 'roky'.
-lookup <- setNames(1996:1933, 9:72)
-s2$roky <- lookup[as.character(s2$age)]
-
-# Calculate a new variable 'years' representing the difference between 2019 and the recoded year.
-s2$years <- 2019 - s2$roky
-
-# Convert the 'gender' column into a factor.
-# Level 1 is labeled "Male" and level 2 is labeled "Female".
-s2$gender <- factor(s2$gender, 
-                    levels = c(1, 2), 
-                    labels = c("Male","Female"))
-
-# Create a subset of the data containing only rows where consent is "yes".
-s2_consent <- dplyr::filter(s2, consent=="yes")
-
-# Further filter the subset to exclude rows where 'etnic_ascr' is "NA".
-s2_consent <- dplyr::filter(s2_consent, etnic_ascr != "NA")
-
-# Further filter the subset to only include rows where multiple survey items (e.g., eurofondy_iv, skolka_iv, etc.) have values less than 5. 
-s2_consent <- dplyr::filter(s2_consent, eurofondy_iv<5 & skolka_iv<5 & skolka_agree<5 & skolka_vote<5 & skolka_norms < 5 & control < 5 & suma < 5 & praca < 5 & potreba<5 & pila <5 )
-
-s2_consent <- mutate(s2_consent, ID = row_number())
-
-s2_mains <- melt(s2_consent,
-        # ID variables - all the variables to keep but not split apart on
-    id.vars=c("etnic_ascr", "ID","eurofondy_iv","skolka_iv" ),
-        # The source columns
-    measure.vars=c("control", "suma", "praca","potreba","pila"),
-        # Name of the destination column that will identify the original
-        # column that the measurement came from
-    variable.name="condition",
-    value.name="measurement"
-)
-
-s2_mains <- filter(s2_mains, condition!="pila") 
-
-# s2_dvs <- s2_mains %>%
-#   group_by(etnic_ascr,condition)%>%
-#   dplyr::select(-ID:-skolka_iv) %>%
-#   get_summary_stats(type = c("mean_sd"))%>%
-#   dplyr::select(-variable)%>%
-#   dplyr::mutate(condition = dplyr::recode(condition,
-#     "control" = "Control",
-#     "suma" = "Equality",
-#     "praca" = "Reciprocity",
-#     "potreba" = "Need"))%>%
-#   dplyr::mutate(sd = round(sd,2))
-#       
-# 
-# dvstt <- s2_mains %>% 
-# #  pivot_longer(contains("att_"))%>% 
-#     group_by(etnic_ascr)%>% 
-#     t_test(measurement~condition, detailed = T)      
 
 ```
-
-1.  A histogram of the dependent variable
-
-    ```{r}
-    # creating a new dataframe where IV contains the condition, and DV contains the the response
-    s2_long <- pivot_longer(
-      s2_consent,
-      cols = c("control", "suma", "praca", "potreba", "pila"),  
-      names_to = "IV", 
-      values_to = "DV"  
-    )
-
-    ggplot(s2_long, aes(x = DV)) +
-      geom_bar(fill = "skyblue") +
-      labs(title = "Welfare Policy Support", x = "Completely Disagree (1) - Completely Agree (4)", y = "Frequency") +
-      theme_minimal()
-    ```
-
-2.  A correlation matrix for the DV and IVs that the original authors included in the model you are replicating
-
-    ```{r}
-    dummies <- model.matrix(~ IV - 1, data = s2_long)
-
-    # Combine dummy variables with the numeric variable
-    df_for_corr <- cbind(dummies, DV = s2_long$DV)
-
-    # Compute the correlation matrix
-    corr_matrix2 <- cor(df_for_corr)
-
-    # Plot the correlation matrix
-    corrplot(corr_matrix2, 
-             method = "color",        
-             addCoef.col = "black",  
-             tl.col = "black", 
-             type = "upper",
-             title = "Correlation Matrix", 
-             mar = c(0, 0, 1, 0))
-
-    ```
-
-3.  library(naniar)
-
-4.  A visual or tabular depiction of the missingness in the data from part (2); see p. 251-255 of the text.
-
-    ```{r}
-
-    vis_miss(s2_consent)
-
-    missing_summary <- miss_var_summary(s2_consent)
-    print(missing_summary)
-
-    ```
 
 ## Data
 
 Accessed from [Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/6KCW8Z).
+
 ## The Original Paper
 
 -   Have a section about the original paper that answers the following questions:
@@ -189,20 +75,67 @@ Accessed from [Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistent
 
     -   What kind of model are you replicating (logit? probit? negative binomial? etc.)
 
-
 -   Demonstrate that you successfully replicated the authors’ original model. This means you will include a regression table in your paper in which the coefficient estimates, standard errors, and the number of observations are exactly the same as in the original paper.
 
-## Original Model: Ordered Logit
+## Original Model: Ordered Logit Model
 
-```{r}
-s2_mains$condition <- dplyr::recode(s2_mains$condition, suma = "equal", praca = "reciprocity", potreba="need", control = "control")
-s2_mains$measurement <- as.factor(s2_mains$measurement)
+The authors implemented a ordered logit model, with participants included as random factors, using the CLMM function. Condition (control, equality, reciprocity, need), ethnic identity (Slovak, Roma), and their interaction as predictors, and willingness to support the social housing project was the dependent variable
 
-model <- clmm(measurement ~ condition * etnic_ascr + (1|ID),data = s2_mains, threshold = "equidistant", Hess = T)
-summary(model)
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+s3$E1 <- as.ordered(s3$E1)
+s3$E2 <- as.ordered(s3$E2)
+s3$E3 <- as.ordered(s3$E3)
+s3$E4 <- as.ordered(s3$E4)
+
+# using Control as the baseline
+s3$group <- relevel(s3$group, ref = "Control")
+
+og_ordered_logit_control <- polr(E3 ~ group, data = s3, Hess=TRUE)
+ctable <- coef(summary(og_ordered_logit_control))
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = p))
+ci <- confint(og_ordered_logit_control)
+exp(cbind(OR = coef(og_ordered_logit_control), ci))
+og_ll <- logLik(og_ordered_logit_control)
+og_aic <- AIC(og_ordered_logit_control)
+og_bic <- BIC(og_ordered_logit_control)
+
+# using Reciprocity as the baseline
+s3$group <- relevel(s3$group, ref = "Reciprocity")
+
+og_ordered_logit_recip  <- polr(E3 ~ group, data = s3, Hess=TRUE)
+ctable <- coef(summary(og_ordered_logit_recip))
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = p))
+ci <- confint(og_ordered_logit_recip)
+exp(cbind(OR = coef(og_ordered_logit_recip), ci))
+
+#stargazer(og_ordered_logit_control, )
 ```
 
-## An Additional Model: Multinomial Logit
+## Alternative Models
+
+### Ordered Logit Model with Additional Predictors
+
+The original model only used the respondent group as a predictor. I was interested in how adding additional information
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# reset "Control" as the reference category
+s3$group <- relevel(s3$group, ref = "Control")
+
+new_ordered_logit  <- polr(E3 ~ group + EDU + SEX + AGE, data = s3, Hess=TRUE)
+ctable <- coef(summary(new_ordered_logit))
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = p))
+ci <- confint(new_ordered_logit)
+exp(cbind(OR = coef(new_ordered_logit), ci))
+
+# compute in sample metrics for the new ordered logit
+new_ol_ll <-logLik(new_ordered_logit)
+new_ol_aic <- AIC(new_ordered_logit)
+new_ol_bic <- BIC(new_ordered_logit)
+
+```
 
 -   State the additional model(s) you are considering. The additional model(s) **must** be fit to the same dependent variable. Explain why you chose the model(s) you did.
 
@@ -211,6 +144,55 @@ summary(model)
 ## Comparing and Evaluating Models
 
 -   Compare the original model and your new model(s) based on their in- and out-of-sample predictive performance. You will use cross-validation for the latter.
+
+    ```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+    set.seed(12345)  # for reproducibility
+    trainIndex <- createDataPartition(s3$group, p = 0.70, list = FALSE)
+    s3train <- s3[trainIndex, ]
+    s3test <- s3[-trainIndex, ]
+
+    og_model_caret <- train(E3 ~ group, data = s3,
+                          method = "polr",
+                          trControl = trainControl(method = "none"),
+                          tuneGrid = data.frame(method = "logistic"))
+
+    new_model_caret <- train(E3 ~ group + EDU + SEX + AGE, 
+                          data = s3,
+                          method = "polr",
+                          trControl = trainControl(method = "none"),
+                          tuneGrid = data.frame(method = "logistic"))
+
+    pred1 <- predict(og_model_caret, newdata = s3test)
+    pred2 <- predict(new_model_caret, newdata = s3test)
+
+    s3test$result <- factor(s3test$E3, levels = levels(pred1))
+
+
+    # confusion matrices for out of sample performance
+    og_cm <- confusionMatrix(pred1, s3test$E3)
+    og_accuracy <- og_cm$overall["Accuracy"]
+    new_cm <- confusionMatrix(pred2, s3test$E3)
+    new_accuracy <- new_cm$overall["Accuracy"]
+    ```
+
+    ```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+    stargazer(og_ordered_logit_control, new_ordered_logit,
+              type = 'text',
+              dep.var.labels = "DV: Personal Agreement (1-4)",
+              digits = 2,
+              covariate.labels = c("Equality", "Reciprocity", "Need",
+                                   "Secondary Edu (no diploma)", "Secondary Edu (complete)",
+                                   "University Edu", "Female"),
+              add.lines = list("In-Sample Performance",
+                               c("Log Likelihood", round(og_ll, 2), round(new_ol_ll, 2)),
+                               c("AIC", round(og_aic, 2), round(new_ol_aic, 2)),
+                               c("BIC", round(og_bic, 2), round(new_ol_bic, 2)),
+                               "Out-of-sample Performance",
+                               c("Accuracy", round(og_accuracy, 2), round(new_accuracy, 2))
+                               
+              ))
+    ```
 
 -   Decide which model you think is best and justify your decision.
 
@@ -225,4 +207,3 @@ summary(model)
 I used ChatGPT (<https://chatgpt.com/share/67af6953-53d0-8008-a46d-3be0d43b06fc>) to help break down the original papers' data cleaning process. It was quite helpful and helped me understand how they cleaned the filtered the raw data.
 
 ## References
-
