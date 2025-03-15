@@ -71,6 +71,15 @@ Accessed from [Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistent
 
     -   Describe the DV. **Include a plot of the distribution of the DV** and highlight any important qualities (binary? categorical? truncated in some way? Rare? Bimodal? etc.)
 
+    ```{r}
+    s3$E3 <- as.ordered(s3$E3)
+
+    ggplot(s3, aes(x = E3)) +
+           geom_bar(fill = "gray") +
+           labs(x = "Completely Disagree (1) - Completely Agree (4)", y = "Frequency") +
+           theme_minimal()
+    ```
+
     -   How did the author handle missing data?
 
     -   What kind of model are you replicating (logit? probit? negative binomial? etc.)
@@ -82,35 +91,28 @@ Accessed from [Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistent
 The authors implemented a ordered logit model, with participants included as random factors, using the CLMM function. Condition (control, equality, reciprocity, need), ethnic identity (Slovak, Roma), and their interaction as predictors, and willingness to support the social housing project was the dependent variable
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
-s3$E1 <- as.ordered(s3$E1)
-s3$E2 <- as.ordered(s3$E2)
-s3$E3 <- as.ordered(s3$E3)
-s3$E4 <- as.ordered(s3$E4)
 
 # using Control as the baseline
-s3$group <- relevel(s3$group, ref = "Control")
-
+s3$group <- relevel(s3$group, ref = 'Control')
 og_ordered_logit_control <- polr(E3 ~ group, data = s3, Hess=TRUE)
-ctable <- coef(summary(og_ordered_logit_control))
-p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
-(ctable <- cbind(ctable, "p value" = p))
-ci <- confint(og_ordered_logit_control)
-exp(cbind(OR = coef(og_ordered_logit_control), ci))
+
+# calculate in-sample performance metrics 
 og_ll <- logLik(og_ordered_logit_control)
 og_aic <- AIC(og_ordered_logit_control)
 og_bic <- BIC(og_ordered_logit_control)
 
 # using Reciprocity as the baseline
-s3$group <- relevel(s3$group, ref = "Reciprocity")
-
+s3$group <- relevel(s3$group, ref = 'Reciprocity')
 og_ordered_logit_recip  <- polr(E3 ~ group, data = s3, Hess=TRUE)
-ctable <- coef(summary(og_ordered_logit_recip))
-p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
-(ctable <- cbind(ctable, "p value" = p))
-ci <- confint(og_ordered_logit_recip)
-exp(cbind(OR = coef(og_ordered_logit_recip), ci))
 
-#stargazer(og_ordered_logit_control, )
+# regression table for replicated model
+stargazer(og_ordered_logit_control, og_ordered_logit_recip,
+          type = 'latex',
+          column.labels = c("Base = Control", "Base = Reciprocity"),
+          dep.var.labels = "DV: Personal Agreement (1-4)",
+          covariate.labels = c("Control", "Equality",
+                               "Reciprocity", "Need"),
+          digits = 2)
 ```
 
 ## Alternative Models
@@ -122,22 +124,27 @@ The original model only used the respondent group as a predictor. I was interest
 ```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # reset "Control" as the reference category
 s3$group <- relevel(s3$group, ref = "Control")
-
 new_ordered_logit  <- polr(E3 ~ group + EDU + SEX + AGE, data = s3, Hess=TRUE)
-ctable <- coef(summary(new_ordered_logit))
-p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
-(ctable <- cbind(ctable, "p value" = p))
-ci <- confint(new_ordered_logit)
-exp(cbind(OR = coef(new_ordered_logit), ci))
+summary(new_ordered_logit)
 
 # compute in sample metrics for the new ordered logit
 new_ol_ll <-logLik(new_ordered_logit)
 new_ol_aic <- AIC(new_ordered_logit)
 new_ol_bic <- BIC(new_ordered_logit)
 
+# regression table for new model
+stargazer(new_ordered_logit,
+          type = 'latex',
+          column.labels = c("Base = Control"),
+          dep.var.labels = "DV: Personal Agreement (1-4)",
+          covariate.labels = c("Reciprocity", "Equality", "Need",
+                               "Secondary Edu (no diploma)", "Secondary Edu (complete)",
+                               "University Edu", "Female"),
+          digits = 2)
+
 ```
 
--   State the additional model(s) you are considering. The additional model(s) **must** be fit to the same dependent variable. Explain why you chose the model(s) you did.
+-   
 
 -   Provide a regression table that reports the results from this new model(s).
 
@@ -178,7 +185,7 @@ new_ol_bic <- BIC(new_ordered_logit)
 
     ```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
     stargazer(og_ordered_logit_control, new_ordered_logit,
-              type = 'text',
+              type = 'latex',
               dep.var.labels = "DV: Personal Agreement (1-4)",
               digits = 2,
               covariate.labels = c("Equality", "Reciprocity", "Need",
@@ -194,7 +201,58 @@ new_ol_bic <- BIC(new_ordered_logit)
               ))
     ```
 
--   Decide which model you think is best and justify your decision.
+    ## Interpreting Model 2
+
+    ```{r}
+    # scenarios - coop is the quantity of interest (1 vs. 4)
+    X_female <- cbind(mean(drury$gnprat), mean(drury$trade),
+                      mean(drury$tarcst), mean(drury$cost), 1)  # coop = 1, no cooperation
+    X_male <- cbind(mean(drury$gnprat), mean(drury$trade), 
+                       mean(drury$tarcst), mean(drury$cost), 4) # coop = 4, strong cooperation
+
+    # coefficient vectors
+    draws <- mvrnorm(1000, c(coef(order_logit1), order_logit1$zeta), 
+                     solve(order_logit1$Hessian))
+    Beta <- draws[, 1:length(coef(order_logit1))]
+    Taus <- draws[, (length(coef(order_logit1)) + 1):ncol(draws)] 
+
+    # predicted probabilities for "no success" category 
+    pi_nosuccess_nocoop <- plogis(Taus[, 1] - Beta %*% t(X_yescoop))
+    pi_nosuccess_yescoop <- plogis(Taus[, 1] - Beta %*% t(X_yescoop))  
+
+    # predicted probabilities for "yes success" category 
+    pi_yessuccess_nocoop <- 1 - plogis(Taus[, 3] - Beta %*% t(X_nocoop)) 
+    pi_yessuccess_yescoop <- 1 - plogis(Taus[, 3] - Beta %*% t(X_yescoop)) 
+
+    # differences (first differences between strong and no cooperation)
+    fd_nosuccess <- pi_nosuccess_yescoop - pi_nosuccess_nocoop 
+    fd_yessuccess <- pi_yessuccess_yescoop - pi_yessuccess_nocoop
+
+    # plotting 
+    df <- data.frame(
+      fd_nosuccess = fd_nosuccess,
+      fd_yessuccess = fd_yessuccess)
+
+    df_long <- pivot_longer(
+      df,
+      cols = everything(),
+      names_to = "Difference_Type",
+      values_to = "Difference")
+
+    df_long$Difference_Type <- factor(
+      df_long$Difference_Type, 
+      levels = c("fd_nosuccess", "fd_yessuccess"),
+      labels = c("Pr(result = 1 | coop = 4) - Pr(result = 1| coop = 1)", 
+                 "Pr(result = 4 | coop = 4) - Pr(result = 4 | coop = 1)"))
+
+    ggplot(df_long, aes(x = Difference, color = Difference_Type)) +
+      geom_density() +
+      theme_minimal() +
+      labs(
+        x = "Change in Predicted Probability") +
+      scale_x_continuous(limits = c(-0.8, 0.8))
+
+    ```
 
 -   For the best model, you will describes how a particular independent variable of your choosing relates to the dependent variable. A good paper will include a carefully described quantity of interest and present the interpretive estimate in table or graphical form that accurately incorporates our uncertainty around the estimated quantity of interest.
 
